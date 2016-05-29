@@ -52,11 +52,10 @@ if(str_detect(locos, "Windows")){
   hddir = file.path("www", "HIDAP")
 }
 if(!dir.exists(hddir)) dir.create(hddir, recursive = TRUE)
-
 fileLocs = file.path(hddir, "locs.rds")
 
 
-#cacheLocationData()
+cacheLocationData <- function(){
 pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
                                  format = "  downloading :what [:bar] :percent eta: :eta")
 pb$tick(1, tokens = list(what = "connect to db"))
@@ -67,16 +66,21 @@ locs = NULL
 
 try({
   if(brapi::can_internet()){
-  brapi_auth(login$user, login$login)
-  locs = brapi::locations_list()
+    brapi_auth(login$user, login$login)
+    locs = brapi::locations_list()
   }
 })
 #(locs)
+
 if(!is.null(locs) & nrow(locs) > 0){
   pb$tick(1e7/2, tokens = list(what = "cache data"))
   saveRDS(locs, file = fileLocs)
   pb$tick(1e7, tokens = list(what = "finished data download"))
 }
+locs
+}
+
+locs <- cacheLocationData()
 
 locsData <- readRDS("www/HIDAP/locs.rds")
 
@@ -132,8 +136,9 @@ server <- function(input, output, session) {
   }
 
 
-  locsData <- reactiveFileReader(10000, session, filePath = fileLocs, readRDS)
-
+  withProgress(message = "Downloading location data", {
+    locsData <- reactiveFileReader(10000, session, filePath = fileLocs, readRDS)
+  })
 
 
 
