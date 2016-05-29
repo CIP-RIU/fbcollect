@@ -9,24 +9,77 @@ library(brapi)
 library(stringr)
 
 
-cacheLocationData <- function(){
-  pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
-                                   format = "  downloading :what [:bar] :percent eta: :eta")
-  pb$tick(1, tokens = list(what = "connect to db"))
 
-  if(can_internet(dburl)){
-    pb$tick(1e7/2, tokens = list(what = "retrieve data"))
-    brapi = brapi_con("sweetpotato",
-                      paste0(login$sgn, dburl ),
-                      80, login$user, login$login)
-    locs = brapi::locations_list()
-    if(nrow(locs) > 0){
-      pb$tick(1e7, tokens = list(what = "cache data"))
-      saveRDS(locs, file = fileLocs)
-      #pb$tick(1e7, tokens = list(what = "finished data download"))
-    }
-  }
+# cacheLocationData <- function(){
+#   pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
+#                                    format = "  downloading :what [:bar] :percent eta: :eta")
+#   pb$tick(1, tokens = list(what = "connect to db"))
+#
+#   if(!brapi::can_internet()) return(NULL)
+#   pb$tick(1e7/3, tokens = list(what = "retrieve data"))
+#   locs = NULL
+#   try({
+#     brapi = brapi_con("sweetpotato",
+#                       paste0(login$sgn, dburl ),
+#                       80, login$user, login$login)
+#     locs = brapi::locations_list()
+#   })
+#   #print(locs)
+#   if(!is.null(locs)){
+#     locs = readRDS("www/HIDAP/locs.rds")
+#   }
+#   if(nrow(locs) > 0){
+#     pb$tick(1e7/2, tokens = list(what = "cache data"))
+#     saveRDS(locs, file = fileLocs)
+#     pb$tick(1e7, tokens = list(what = "finished data download"))
+#   }
+#
+# }
+
+dburl = "sweetpotatobase-test.sgn.cornell.edu"
+locos = Sys.getenv("OS")
+login <- yaml::yaml.load_file("login.yaml")
+brapi <<- brapi_con("sweetpotato",
+                  paste0(login$sgn, dburl ),
+                  80, login$user, login$login)
+
+
+
+
+if(str_detect(locos, "Windows")){
+  hddir = file.path(Sys.getenv("LOCALAPPDATA"), "HIDAP")
+} else {
+  hddir = file.path("www", "HIDAP")
 }
+if(!dir.exists(hddir)) dir.create(hddir, recursive = TRUE)
+
+fileLocs = file.path(hddir, "locs.rds")
+
+
+#cacheLocationData()
+pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
+                                 format = "  downloading :what [:bar] :percent eta: :eta")
+pb$tick(1, tokens = list(what = "connect to db"))
+
+#if(!brapi::can_internet()) return(NULL)
+pb$tick(1e7/3, tokens = list(what = "retrieve data"))
+locs = NULL
+
+try({
+  if(brapi::can_internet()){
+  brapi_auth(login$user, login$login)
+  locs = brapi::locations_list()
+  }
+})
+#(locs)
+if(!is.null(locs) & nrow(locs) > 0){
+  pb$tick(1e7/2, tokens = list(what = "cache data"))
+  saveRDS(locs, file = fileLocs)
+  pb$tick(1e7, tokens = list(what = "finished data download"))
+}
+
+locsData <- readRDS("www/HIDAP/locs.rds")
+
 
 
 ui <- dashboardPage(skin = "yellow",
@@ -71,48 +124,21 @@ ui <- dashboardPage(skin = "yellow",
 
 
 server <- function(input, output, session) {
-
-  dburl = "sweetpotatobase-test.sgn.cornell.edu"
-  locos = Sys.getenv("OS")
-
-  if(str_detect(locos, "Windows")){
-    hddir = file.path(Sys.getenv("LOCALAPPDATA"), "HIDAP")
-  } else {
-    hddir = file.path("www", "HIDAP")
-  }
-  if(!dir.exists(hddir)) dir.create(hddir, recursive = TRUE)
-
-
-  login <- yaml::yaml.load_file("login.yaml")
-
-  #session = NULL
-  fileLocs = file.path(hddir, "locs.rds")
-
-  #cacheLocationData()
-  pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
-                                   format = "  downloading :what [:bar] :percent eta: :eta")
-  pb$tick(1, tokens = list(what = "connect to db"))
-
-  if(can_internet(dburl)){
-    pb$tick(1e7/2, tokens = list(what = "retrieve data"))
-    brapi = brapi_con("sweetpotato",
-                      paste0(login$sgn, dburl ),
-                      80, login$user, login$login)
-    locs = brapi::locations_list()
-    if(nrow(locs) > 0){
-      pb$tick(1e7, tokens = list(what = "cache data"))
-      saveRDS(locs, file = fileLocs)
-      #pb$tick(1e7, tokens = list(what = "finished data download"))
-    }
-  }
-
-
-  locsData <- reactiveFileReader(600000, session, filePath = fileLocs, readRDS)
-
-
   sharedValues <- reactiveValues()
 
+
+  if(!is.null(locs)){
+    sharedValues[['data']] = readRDS("www/HIDAP/locs.rds")
+  }
+
+
+  locsData <- reactiveFileReader(10000, session, filePath = fileLocs, readRDS)
+
+
+
+
   observe({
+    invalidateLater(1000, session)
     if(file.exists(fileLocs)){
       sharedValues[['data']] <- locsData()
     } else {

@@ -1,7 +1,7 @@
 Package: fbcollect
 Type: Package
 Title: Fieldbook Data Collection Forms
-Version: 0.1.0.9004
+Version: 0.1.0.9005
 Author: Reinhard Simon <R.SIMON@CGIAR.ORG>
 Maintainer: Reinhard Simon <r.simon@cgiar.org>
 Description: Can be configured using tabular data restrictions.
