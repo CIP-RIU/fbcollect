@@ -7,6 +7,7 @@ library(shinyFiles)
 library(DT)
 library(brapi)
 library(stringr)
+library(magrittr)
 
 
 
@@ -42,7 +43,9 @@ login <- yaml::yaml.load_file("login.yaml")
 brapi <<- brapi_con("sweetpotato",
                   paste0(login$sgn, dburl ),
                   80, login$user, login$login)
-
+is.server <- function(){
+  login$mode == 'server'
+}
 
 
 
@@ -80,9 +83,8 @@ if(!is.null(locs) & nrow(locs) > 0){
 locs
 }
 
-locs <- cacheLocationData()
-
-locsData <- readRDS("www/HIDAP/locs.rds")
+locs = NULL
+#locs <- cacheLocationData()
 
 
 
@@ -94,22 +96,25 @@ ui <- dashboardPage(skin = "yellow",
                       tabBox(width = 12, selected = "Data source", height = 500,
                              tabPanel("Data source",
                               fluidRow(
-                                column(4,
-                                  radioButtons("crop", "Crop",
-                                               c("potato", "sweetpotato", "cassava",
-                                                         "yam", "musa"), "sweetpotato",
-                                               inline = TRUE
-                                               ),
-                                  radioButtons("sourceType", "Data source type",
-                                               choices = c("Local",
-                                                           "BrAPI",
-                                                           "CloneSelector", "DataCollector",
-                                                           "AccuDataLog", "Fieldbook App"),
-                                               selected = "Local", inline = TRUE)
+                                column(3,
+                                  uiOutput("sourceType"),
+                                  conditionalPanel("input.sources == 'BrAPI'",
+                                                   radioButtons("brapi_db", "BTI DB:",
+                                                                c("sweetpotatobase-test.sgn.cornell.edu",
+                                                                              "sweetpotatobase.org")),
+                                                   numericInput("brapi_port", "Port", 80, 80, 3000)
+                                  ),
+                                  uiOutput("cropType"),
+                                  conditionalPanel("input.sources == 'BrAPI'",
+                                                   textInput("user", "User:"),
+                                                   passwordInput("password", "Password:"),
+                                                   textInput("proxy", "Proxy:", "sgn:eggplant")
+                                                   ),
+                                  actionButton("loadData", "Load data")
+                                  ),
 
-                                       ),
 
-                                column(8,
+                                column(9,
                                   tabBox(width = 12,
                                     tabPanel("Locations",
                                              DT::dataTableOutput("cache_test")
@@ -122,7 +127,8 @@ ui <- dashboardPage(skin = "yellow",
 
                              )
                       )
-                    )
+                      )
+
 )
 
 
@@ -131,28 +137,95 @@ server <- function(input, output, session) {
   sharedValues <- reactiveValues()
 
 
-  if(!is.null(locs)){
-    sharedValues[['data']] = readRDS("www/HIDAP/locs.rds")
+  list_cache_crops <- function(path_start = getwd(), src = input$sources){
+    x = list.dirs(file.path(path_start, hddir, src, 'crops'))
+    x[('crops' != basename(x))] %>% basename
   }
 
 
-  withProgress(message = "Downloading location data", {
-    locsData <- reactiveFileReader(10000, session, filePath = fileLocs, readRDS)
-  })
+  get_data <-reactive({
+    sharedValues[['data']] = NULL
+    if(input$sources == 'Demo') {
+      sharedValues[['data']] = readRDS(paste0(hddir,input$sources,"/crops/",input$crop,"/locs.rds"))
+    }
+    if(input$sources == 'BrAPI' & input$crop == "sweetpotato") {
+      withProgress(message="Conneting to DB ...",
+      try({
+        if(brapi::can_internet()){
+          brapi <<- brapi_con(input$crop,
+                              paste0(input$proxy, "@", input$brapi_db),
+                              input$brapi_port, input$user, input$password)
+          brapi_auth(input$user, input$password)
+          sharedValues[['data']] = brapi::locations_list()
+        }
+      })
+      )
 
-
-
-  observe({
-    invalidateLater(1000, session)
-    if(file.exists(fileLocs)){
-      sharedValues[['data']] <- locsData()
-    } else {
-      cacheLocationData()
     }
 
   })
 
+
+  output$sourceType <- renderUI({
+    src_all = c("Local", "Local",
+                "BrAPI",
+                "CloneSelector", "DataCollector",
+                "AccuDataLog", "Fieldbook App")
+    if(!is.server()){
+      src_all = c("Demo",
+                  "BrAPI")
+    }
+    radioButtons("sources", "Data source type",
+                 choices = src_all,
+                inline = TRUE)
+  })
+
+  output$cropType <- renderUI({
+    req(input$sources)
+    #print(input$sources)
+    crops_all = c("potato", "sweetpotato", "cassava",
+                  "yam", "musa")
+    if(input$sources == 'Local' | input$sources == 'Demo') {
+      crops_all = list_cache_crops()
+    }
+    if(input$sources == 'BrAPI' ) {
+
+      crops_all = c("sweetpotato", "cassava",
+                    "yam")
+    }
+    # print(crops_all)
+    # print(getwd())
+    # print(list_cache_crops())
+    radioButtons("crop", "Crop",
+                 crops_all,
+                 inline = TRUE
+    )
+
+  })
+
+
+  # withProgress(message = "Downloading location data", {
+  #   locsData <- reactiveFileReader(10000, session, filePath = fileLocs, readRDS)
+  # })
+
+
+
+  # observe({
+  #   invalidateLater(1000, session)
+  #   # if(file.exists(fileLocs)){
+  #   #   sharedValues[['data']] <- locsData()
+  #   # } else {
+  #   #   cacheLocationData()
+  #   # }
+  #
+  # })
+
+  observeEvent(input$loadData,{
+    get_data()
+  })
+
   output$cache_test <- DT::renderDataTable({
+    req(sharedValues[['data']])
     sharedValues[['data']]
   }, options = list(scrollX = TRUE))
 
