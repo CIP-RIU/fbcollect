@@ -46,7 +46,7 @@ cacheLocationData <- function(){
 
 cacheLocationData()
 
-locsData <- reactiveFileReader(1000, session, filePath = fileLocs, readRDS)
+locsData <- reactiveFileReader(600000, session, filePath = fileLocs, readRDS)
 
 ui <- dashboardPage(skin = "yellow",
                     dashboardHeader(title = "HIDAP collect"),
