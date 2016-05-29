@@ -15,7 +15,7 @@ locos = Sys.getenv("OS")
 if(str_detect(locos, "Windows")){
   hddir = file.path(Sys.getenv("LOCALAPPDATA"), "HIDAP")
 } else {
-  hddir = file.path("usr", "HIDAP")
+  hddir = ""
 }
   if(!dir.exists(hddir)) dir.create(hddir, recursive = TRUE)
 
