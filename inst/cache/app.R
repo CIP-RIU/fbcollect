@@ -9,22 +9,6 @@ library(brapi)
 library(stringr)
 
 
-dburl = "sweetpotatobase-test.sgn.cornell.edu"
-locos = Sys.getenv("OS")
-
-if(str_detect(locos, "Windows")){
-  hddir = file.path(Sys.getenv("LOCALAPPDATA"), "HIDAP")
-} else {
-  hddir = file.path(tempdir())
-}
-  if(!dir.exists(hddir)) dir.create(hddir, recursive = TRUE)
-
-
-login <- yaml::yaml.load_file("login.yaml")
-
-session = NULL
-fileLocs = file.path(hddir, "locs.rds")
-
 cacheLocationData <- function(){
   pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
                                    format = "  downloading :what [:bar] :percent eta: :eta")
@@ -44,9 +28,6 @@ cacheLocationData <- function(){
   }
 }
 
-cacheLocationData()
-
-locsData <- reactiveFileReader(600000, session, filePath = fileLocs, readRDS)
 
 ui <- dashboardPage(skin = "yellow",
                     dashboardHeader(title = "HIDAP collect"),
@@ -90,6 +71,44 @@ ui <- dashboardPage(skin = "yellow",
 
 
 server <- function(input, output, session) {
+
+  dburl = "sweetpotatobase-test.sgn.cornell.edu"
+  locos = Sys.getenv("OS")
+
+  if(str_detect(locos, "Windows")){
+    hddir = file.path(Sys.getenv("LOCALAPPDATA"), "HIDAP")
+  } else {
+    hddir = file.path("www", "HIDAP")
+  }
+  if(!dir.exists(hddir)) dir.create(hddir, recursive = TRUE)
+
+
+  login <- yaml::yaml.load_file("login.yaml")
+
+  #session = NULL
+  fileLocs = file.path(hddir, "locs.rds")
+
+  #cacheLocationData()
+  pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
+                                   format = "  downloading :what [:bar] :percent eta: :eta")
+  pb$tick(1, tokens = list(what = "connect to db"))
+
+  if(can_internet(dburl)){
+    pb$tick(1e7/2, tokens = list(what = "retrieve data"))
+    brapi = brapi_con("sweetpotato",
+                      paste0(login$sgn, dburl ),
+                      80, login$user, login$login)
+    locs = brapi::locations_list()
+    if(nrow(locs) > 0){
+      pb$tick(1e7, tokens = list(what = "cache data"))
+      saveRDS(locs, file = fileLocs)
+      #pb$tick(1e7, tokens = list(what = "finished data download"))
+    }
+  }
+
+
+  locsData <- reactiveFileReader(600000, session, filePath = fileLocs, readRDS)
+
 
   sharedValues <- reactiveValues()
 
