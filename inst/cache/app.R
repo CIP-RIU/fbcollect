@@ -9,33 +9,6 @@ library(brapi)
 library(stringr)
 
 
-
-# cacheLocationData <- function(){
-#   pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
-#                                    format = "  downloading :what [:bar] :percent eta: :eta")
-#   pb$tick(1, tokens = list(what = "connect to db"))
-#
-#   if(!brapi::can_internet()) return(NULL)
-#   pb$tick(1e7/3, tokens = list(what = "retrieve data"))
-#   locs = NULL
-#   try({
-#     brapi = brapi_con("sweetpotato",
-#                       paste0(login$sgn, dburl ),
-#                       80, login$user, login$login)
-#     locs = brapi::locations_list()
-#   })
-#   #print(locs)
-#   if(!is.null(locs)){
-#     locs = readRDS("www/HIDAP/locs.rds")
-#   }
-#   if(nrow(locs) > 0){
-#     pb$tick(1e7/2, tokens = list(what = "cache data"))
-#     saveRDS(locs, file = fileLocs)
-#     pb$tick(1e7, tokens = list(what = "finished data download"))
-#   }
-#
-# }
-
 dburl = "sweetpotatobase-test.sgn.cornell.edu"
 locos = Sys.getenv("OS")
 login <- yaml::yaml.load_file("login.yaml")
@@ -100,14 +73,8 @@ ui <- dashboardPage(skin = "yellow",
                                                          "yam", "musa"), "sweetpotato",
                                                inline = TRUE
                                                ),
-                                  radioButtons("sourceType", "Data source type",
-                                               choices = c("Local",
-                                                           "BrAPI",
-                                                           "CloneSelector", "DataCollector",
-                                                           "AccuDataLog", "Fieldbook App"),
-                                               selected = "Local", inline = TRUE)
-
-                                       ),
+                                  uiOutput("sourceType")
+                                ),
 
                                 column(8,
                                   tabBox(width = 12,
@@ -153,8 +120,26 @@ server <- function(input, output, session) {
   })
 
   output$cache_test <- DT::renderDataTable({
+    req(sharedValues[['data']])
     sharedValues[['data']]
   }, options = list(scrollX = TRUE))
+
+  output$sourceType <- renderUI({
+
+    srcTyp = c("Local", "BrAPI")
+    if(str_detect(Sys.getenv("OS"), "Windows")){
+      srcTyp = c("Local",
+                 "BrAPI",
+                 "CloneSelector", "DataCollector",
+                 "AccuDataLog", "Fieldbook App")
+    }
+
+    radioButtons("srcType", "Data source type",
+                 choices = srcTyp,
+                 selected = "BrAPI", inline = TRUE)
+
+  })
+
 
 }
 
