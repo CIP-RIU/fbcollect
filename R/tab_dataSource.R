@@ -24,15 +24,16 @@ tab_dataSource <- function(){
                                               passwordInput("password", "Password:"),
                                               textInput("proxy", "Proxy:", "sgn:eggplant")
                              ),
-                             actionButton("connectSource", "Connect Source"),
-                             conditionalPanel("input.sources == 'Local'",
-                                              radioButtons("importFrom", "ImportFrom",
-                                                           c("CSV",
-                                                             "CloneSelector",
-                                                             "DataCollector",
-                                                             "AccuDataLog",
-                                                             "FieldbookAPP",
-                                                             "Collect"), inline = TRUE)
+                             actionButton("connectSource", "Connect Source")
+                             # ,
+                             # conditionalPanel("input.sources == 'Local'",
+                             #                  radioButtons("importFrom", "ImportFrom",
+                             #                               c("CSV",
+                             #                                 "CloneSelector",
+                             #                                 "DataCollector",
+                             #                                 "AccuDataLog",
+                             #                                 "FieldbookAPP",
+                             #                                 "Collect"), inline = TRUE)
                              ),
                              hr()
                       ),

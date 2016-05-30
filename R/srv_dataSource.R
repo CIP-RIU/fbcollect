@@ -95,7 +95,8 @@ srv_dataSource <- function(input, output, session, values){
 
 
   output$sourceType <- renderUI({
-    src_all = c("Local", "Demo",
+    src_all = c(#"Local",
+                "Demo",
                 "BrAPI")
     if(is.server()){
       src_all = c("Demo",
