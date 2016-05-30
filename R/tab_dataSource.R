@@ -34,8 +34,8 @@ tab_dataSource <- function(){
                              #                                 "AccuDataLog",
                              #                                 "FieldbookAPP",
                              #                                 "Collect"), inline = TRUE)
-                             ),
-                             hr()
+                             #),
+                             #hr()
                       ),
 
 
