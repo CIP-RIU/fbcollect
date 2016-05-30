@@ -11,31 +11,6 @@ library(magrittr)
 
 
 
-# cacheLocationData <- function(){
-#   pb <- progress::progress_bar$new(total = 1e7, clear = FALSE, width = 60,
-#                                    format = "  downloading :what [:bar] :percent eta: :eta")
-#   pb$tick(1, tokens = list(what = "connect to db"))
-#
-#   if(!brapi::can_internet()) return(NULL)
-#   pb$tick(1e7/3, tokens = list(what = "retrieve data"))
-#   locs = NULL
-#   try({
-#     brapi = brapi_con("sweetpotato",
-#                       paste0(login$sgn, dburl ),
-#                       80, login$user, login$login)
-#     locs = brapi::locations_list()
-#   })
-#   #print(locs)
-#   if(!is.null(locs)){
-#     locs = readRDS("www/HIDAP/locs.rds")
-#   }
-#   if(nrow(locs) > 0){
-#     pb$tick(1e7/2, tokens = list(what = "cache data"))
-#     saveRDS(locs, file = fileLocs)
-#     pb$tick(1e7, tokens = list(what = "finished data download"))
-#   }
-#
-# }
 
 dburl = "sweetpotatobase-test.sgn.cornell.edu"
 locos = Sys.getenv("OS")
@@ -52,9 +27,12 @@ is.server <- function(){
 if(str_detect(locos, "Windows")){
   hddir = file.path(Sys.getenv("LOCALAPPDATA"), "HIDAP")
 } else {
-  hddir = file.path("www", "HIDAP")
+  hddir = file.path("/Users", Sys.getenv("USER"),"Dcouments", "HIDAP")
 }
-if(!dir.exists(hddir)) dir.create(hddir, recursive = TRUE)
+if(!dir.exists(hddir)) {
+  dir.create(hddir, recursive = TRUE)
+  file.copy(system.file("/cache/www/HIDAP/Demo", package = 'fbcollect'), hddir, recursive = TRUE)
+}
 fileLocs = file.path(hddir, "locs.rds")
 
 
@@ -137,19 +115,22 @@ server <- function(input, output, session) {
   sharedValues <- reactiveValues()
 
 
-  list_cache_crops <- function(path_start = getwd(), src = input$sources){
-    x = list.dirs(file.path(path_start, hddir, src, 'crops'))
-    x[('crops' != basename(x))] %>% basename
+  list_cache_crops <- function( src = input$sources){
+    x = list.dirs(file.path( hddir, src, 'crops'))
+    out = x[('crops' != basename(x))] %>% basename
+    #print(out)
+    if(length(out) == 0) return(NULL)
+    out
   }
 
 
   get_data <-reactive({
     sharedValues[['data']] = NULL
     if(input$sources == 'Demo') {
-      sharedValues[['data']] = readRDS(paste0(hddir,input$sources,"/crops/",input$crop,"/locs.rds"))
+      sharedValues[['data']] = readRDS(file.path(hddir,input$sources,"crops",input$crop,"locs.rds"))
     }
     if(input$sources == 'BrAPI' & input$crop == "sweetpotato") {
-      withProgress(message="Conneting to DB ...",
+      withProgress(message="Connecting to DB ...",
       try({
         if(brapi::can_internet()){
           brapi <<- brapi_con(input$crop,
@@ -167,11 +148,11 @@ server <- function(input, output, session) {
 
 
   output$sourceType <- renderUI({
-    src_all = c("Local", "Local",
+    src_all = c("Local", "Demo",
                 "BrAPI",
                 "CloneSelector", "DataCollector",
-                "AccuDataLog", "Fieldbook App")
-    if(!is.server()){
+                "AccuDataLog", "FieldbookApp")
+    if(is.server()){
       src_all = c("Demo",
                   "BrAPI")
     }
@@ -183,9 +164,10 @@ server <- function(input, output, session) {
   output$cropType <- renderUI({
     req(input$sources)
     #print(input$sources)
-    crops_all = c("potato", "sweetpotato", "cassava",
+    crops = c("potato", "sweetpotato", "cassava",
                   "yam", "musa")
-    if(input$sources == 'Local' | input$sources == 'Demo') {
+    crops_all = crops
+    if(input$sources == 'Demo') {
       crops_all = list_cache_crops()
     }
     if(input$sources == 'BrAPI' ) {
@@ -196,6 +178,7 @@ server <- function(input, output, session) {
     # print(crops_all)
     # print(getwd())
     # print(list_cache_crops())
+    if(is.null(crops_all)) crops_all = crops
     radioButtons("crop", "Crop",
                  crops_all,
                  inline = TRUE
@@ -204,21 +187,6 @@ server <- function(input, output, session) {
   })
 
 
-  # withProgress(message = "Downloading location data", {
-  #   locsData <- reactiveFileReader(10000, session, filePath = fileLocs, readRDS)
-  # })
-
-
-
-  # observe({
-  #   invalidateLater(1000, session)
-  #   # if(file.exists(fileLocs)){
-  #   #   sharedValues[['data']] <- locsData()
-  #   # } else {
-  #   #   cacheLocationData()
-  #   # }
-  #
-  # })
 
   observeEvent(input$loadData,{
     get_data()
